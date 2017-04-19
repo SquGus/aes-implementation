@@ -2,13 +2,19 @@ import sys
 import os.path
 import base64
 
+BLOCK_SIZE = 16
+
 def read_file(filename):
 	file = open(filename, "rb")
 	fileBytes = [];
 	while True:
-		block = base64.b16encode(file.read(1))
-		if block == b"":
+		block = base64.b16encode(file.read(BLOCK_SIZE))
+		if not block:
 			break
+		if len(block) < 32:
+			block += b'01'
+			while len(block) < 32:
+				block += b'00'
 		fileBytes.append(block)
 	return fileBytes
 

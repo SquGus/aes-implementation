@@ -36,10 +36,45 @@ def read_file(filename):
 	return fileBytes
 
 
-# Main function that will call every stage of the encryption
-def cypher(byte, expandedKey):
-	print("BYTE -> " + byte.decode("utf-8"))
+# Simple XOR from block with key of the round
+def add_round_key(state, expandedKey):
+	print("must do XOR or ADD_ROUND_KEY")
 
+
+def sub_bytes(state):
+	print("must do SUB_BYTES")
+
+
+def shift_rows(state):
+	print("must do SHIFT_ROWS")
+
+def mix_columns(state):
+	print("must do SHIFT_ROWS")
+
+
+# Function that will call every stage of the encryption
+def cypher(byte, expandedKey):
+	state = byte
+
+	print(0)
+	state = add_round_key(state, 0)
+
+	for i in range(1,10):
+		print(i)
+		state = sub_bytes(state)
+		state = shift_rows(state)
+		state = mix_columns(state)
+		state = add_round_key(state, i)
+
+	print(10)
+	state = sub_bytes(state)
+	state = shift_rows(state)
+	state = add_round_key(state, 10)
+
+	return state
+
+
+# Main function
 def main(filename, keyfile):
 	name = filename
 	

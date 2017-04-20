@@ -76,9 +76,7 @@ def read_file(filename):
 
 def bytes_to_matrix(block):
     """ Converts 16 byte array to 4x4 matrix. """
-    print (block)
     matrix = [list(block[i:i+4]) for i in range(0, len(block), 4)]
-    print (matrix)
     return matrix
 
 

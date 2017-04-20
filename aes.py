@@ -1,6 +1,8 @@
 import sys
 import os.path
 import base64
+import copy
+from operator import xor
 
 BLOCK_SIZE = 16
 
@@ -47,15 +49,25 @@ def read_key(keyname):
     file = open(keyname, "rb")
     key = base64.b16encode(file.read(BLOCK_SIZE))
 
-    if not key or len(key) < 32:
-        print("ERROR: Key is not large enough.")
-        return -1
-    return key
-
-
+# Expands key and returns expanded key
 def expand_key(key):
-    """ Expands key and returns expanded key """
-    print("expand key")
+	expandedKey = [0] * 176
+	temp, c, i = [0] * 4, 16, 1
+	for j in range (0, 16):
+		expandedKey[j] = key[j]
+
+	while c < 176:
+		for a in range (0, 4):
+			temp[a] = expandedKey[a+c -4]
+		if (c % 16 == 0):
+			#Falta rotate
+			for a in range(0,4):
+				#Sbox
+				temp[a]  
+		for a in range(0,4):
+			expandedKey[c] = (xor(bool(expandedKey[c-16]), bool(temp[a])))
+			c = c + 1
+	print("expand key")
 
 
 def read_file(filename):

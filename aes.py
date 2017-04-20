@@ -53,13 +53,13 @@ def read_key(keyname):
     return key
 
 
-# Expands key and returns expanded key
 def expand_key(key):
+    """ Expands key and returns expanded key """
     print("expand key")
 
 
-# Reads file and returns list with 16byte-blocks
 def read_file(filename):
+    """ Reads file and returns list with 16byte-blocks """
     file = open(filename, "rb")
     fileBytes = [];
     while True:
@@ -75,18 +75,21 @@ def read_file(filename):
     return fileBytes
 
 def bytes_to_matrix(block):
+    """ Converts 16 byte array to 4x4 matrix. """
     print (block)
     matrix = [list(block[i:i+4]) for i in range(0, len(block), 4)]
     print (matrix)
     return matrix
 
-def xor_bytes(a, b):
-    result = bytes(i^j for i, j in zip(a, b))
-    return result
 
 def matrix_to_bytes(matrix):
+    """ Converts 4x4 matrix to a 16 byte array. """
     return bytes(sum(matrix, []))
 
+def xor_bytes(a, b):
+    """ Returns result of applying Xor to A and B """
+    result = bytes(i^j for i, j in zip(a, b))
+    return result
 
 # Simple XOR from block with key of the round
 def add_round_key(state, expandedKey):
@@ -134,8 +137,6 @@ def cypher(byte, expandedKey):
 
         return state
 
-
-# Main function
 def main(filename, keyfile):
     name = filename
     key = read_key(keyfile)

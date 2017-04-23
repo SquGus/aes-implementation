@@ -44,6 +44,9 @@ inv_s_box = (
         0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
         )
 
+# God praise stack overflow, basically cross product
+xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
+
 # Reads key and returns bytes of that key
 def read_key(keyname):
     file = open(keyname, "rb")
@@ -72,7 +75,6 @@ def expand_key(key):
 	    for a in range(0,4):
 		    expandedKey[c] = (xor(bool(expandedKey[c-16]), bool(temp[a])))
 		    c = c + 1
-    print("expand key")
 
 def read_file(filename):
     """ Reads file and returns list with 16byte-blocks """
@@ -100,89 +102,83 @@ def matrix_to_bytes(matrix):
     """ Converts 4x4 matrix to a 16 byte array. """
     return bytes(sum(matrix, []))
 
-def xor_bytes(a, b):
-    """ Returns result of applying Xor to A and B """
-    result = bytes(i^j for i, j in zip(a, b))
-    return result
-
-def add_round_key(state, expandedKey):
-    """ Simple XOR from block with key of the round """
-    print("add_round_key PENDING")
-    return state
-
-
 class AES:
 
-    def __init__(self, key):
-        print('Expand the key')
-        # expanded_key = [[43L, 126L, 21L, 22L], [40L, 174L, 210L, 166L], [171L, 247L, 21L, 136L], [9L, 207L, 79L, 60L], [160L, 250L, 254L, 23L], [136L, 84L, 44L, 177L], [35L, 163L, 57L, 57L], [42L, 108L, 118L, 5L], [242L, 194L, 149L, 242L], [122L, 150L, 185L, 67L], [89L, 53L, 128L, 122L], [115L, 89L, 246L, 127L], [61L, 128L, 71L, 125L], [71L, 22L, 254L, 62L], [30L, 35L, 126L, 68L], [109L, 122L, 136L, 59L], [239L, 68L, 165L, 65L], [168L, 82L, 91L, 127L], [182L, 113L, 37L, 59L], [219L, 11L, 173L,0L], [212L, 209L, 198L, 248L], [124L, 131L, 157L, 135L], [202L, 242L, 184L, 188L], [17L, 249L, 21L, 188L], [109L, 136L, 163L, 122L], [17L, 11L, 62L, 253L], [219L, 249L, 134L, 65L], [202L, 0L, 147L, 253L], [78L, 84L, 247L, 14L], [95L, 95L, 201L, 243L], [132L, 166L, 79L, 178L], [78L, 166L, 220L, 79L], [234L, 210L, 115L, 33L], [181L, 141L, 186L, 210L], [49L, 43L, 245L, 96L], [127L, 141L, 41L, 47L], [172L, 119L, 102L, 243L], [25L, 250L, 220L, 33L], [40L, 209L, 41L, 65L], [87L, 92L, 0L, 110L], [208L, 20L, 249L, 168L], [201L, 238L, 37L, 137L], [225L, 63L, 12L, 200L], [182L, 99L, 12L, 166L]]
+    def __add_round_key(self, state, key):
+        s = [[None for j in range(4)] for i in range(len(state))]
+        for i, x in enumerate(state):
+            for j, byte in enumerate(x):
+                s[i][j] = byte ^ key[i][j]
+        return s
 
-    def __shift_rows(self, state):
-        print("shift_rows DONE")
-        s = bytes_to_matrix(state)
+    def __sub_bytes(self, state):
+        return [[s_box[byte] for byte in x] for x in state]
+
+    def __inv_sub_bytes(self, state):
+        return [[inv_s_box[byte] for byte in x] for x in state]
+
+    def __shift_rows(self, s):
         s[0][1], s[1][1], s[2][1], s[3][1] = s[1][1], s[2][1], s[3][1], s[0][1]
         s[0][2], s[1][2], s[2][2], s[3][2] = s[2][2], s[3][2], s[0][2], s[1][2]
         s[0][3], s[1][3], s[2][3], s[3][3] = s[3][3], s[0][3], s[1][3], s[2][3]
-        state = matrix_to_bytes(s)
-        return state
+        return s
 
-
-    def __inv_shift_rows(self, state):
-        print("inv_shift_rows DONE")
-        s = bytes_to_matrix(state)
+    def __inv_shift_rows(self, s):
         s[0][1], s[1][1], s[2][1], s[3][1] = s[3][1], s[0][1], s[1][1], s[2][1]
         s[0][2], s[1][2], s[2][2], s[3][2] = s[2][2], s[3][2], s[0][2], s[1][2]
         s[0][3], s[1][3], s[2][3], s[3][3] = s[1][3], s[2][3], s[3][3], s[0][3]
-        state = matrix_to_bytes(s)
-        return state
+        return s
 
-    def __sub_bytes(self, state):
-        print("sub_bytes PENDING")
-        return state
-
-    def __inv_sub_bytes(self, s):
+    def __mix_columns(self, s):
         for i in range(4):
-            for j in range(4):
-                s[i][j] = InvSbox[s[i][j]]
+            t = s[i][0] ^ s[i][1] ^ s[i][2] ^ s[i][3]
+            u = s[i][0]
+            s[i][0] ^= t ^ xtime(s[i][0] ^ s[i][1])
+            s[i][1] ^= t ^ xtime(s[i][1] ^ s[i][2])
+            s[i][2] ^= t ^ xtime(s[i][2] ^ s[i][3])
+            s[i][3] ^= t ^ xtime(s[i][3] ^ u)
+        return s
 
-    def __mix_columns(self, state):
-        print("mix_columns PENDING")
-        return state
+    def __inv_mix_columns(self, s):
+        for i in range(4):
+            u = xtime(xtime(s[i][0] ^ s[i][2]))
+            v = xtime(xtime(s[i][1] ^ s[i][3]))
+            s[i][0] ^= u
+            s[i][1] ^= v
+            s[i][2] ^= u
+            s[i][3] ^= v
+        return s
 
-    def encrypt(self, block, expandedKey):
+    def encrypt(self, block, expanded_key, rounds):
         """ Function that will call every stage of the encryption """
-        state = block
+        state = self.__add_round_key(block, expanded_key)
 
-        state = add_round_key(state, expandedKey)
-
-        for i in range(1,10):
-            print(i)
-            state = self.__inv_shift_rows(state)
-            state = self.__inv_sub_bytes(state)
+        for i in range(1, rounds):
+            state = self.__sub_bytes(state)
+            state = self.__shift_rows(state)
             state = self.__mix_columns(state)
-            state = self.__add_round_key(state, expandedKey)
+            state = self.__add_round_key(state, expanded_key)
 
         state = self.__sub_bytes(state)
         state = self.__shift_rows(state)
-        state = self.__add_round_key(state, expandedKey)
+        state = self.__add_round_key(state, expanded_key)
 
         return state
 
-    def decrypt(self, ):
+    def decrypt(self, block, expanded_key, rounds):
         """ Function that will call every the inverse of the encryption """
-        state = block
+        state = self.__add_round_key(block, expanded_key)
 
-        state = add_round_key(state, expandedKey)
+        for i in range(rounds -1, 0, -1):
 
-        for i in range(10, 0, -1):
-            state = self.__sub_bytes(state)
-            state = self.__shift_rows(state)
-            state = self.__add_round_key(state, expandedKey)
+            state = self.__inv_shift_rows(state)
+            state = self.__inv_sub_bytes(state)
+            state = self.__add_round_key(state, expanded_key)
             state = self.__inv_mix_columns(state)
 
         state = self.__inv_shift_rows(state)
         state = self.__inv_sub_bytes(state)
-        state = self.__add_round_key(state, expandedKey)
+        state = self.__add_round_key(state, expanded_key)
 
         return state
 
@@ -194,14 +190,32 @@ def main(filename, keyfile):
     if key == -1:
         return
     else:
-        expandedKey = expand_key(key)
+        expanded_key = expand_key(key)
 
-    blocks = read_file(filename)
-    aes = AES(key)
-    encrypted = aes.encrypt(blocks, expandedKey)
+    ## IM TESTING WITH THIS VALUES
+    # KEY 000102030405060708090a0b0c0d0e0f
+    # PLAINTEXT 00112233445566778899aabbccddeeff
+    # blocks = read_file(filename)
+    rounds = 10
+
+    block = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
+    expanded_key = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254], [182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254], [182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65], [71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253], [60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170], [94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107], [20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38], [71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210], [84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78], [19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
+
+    aes = AES()
+    encrypted = aes.encrypt(
+            block,
+            expanded_key,
+            rounds
+            )
+    print ("Ecrypted")
     print (encrypted)
-    # decrypted = self.AES.decrypt(encrypted)
-    # print (decrypted)
+    decrypted = aes.decrypt(
+            encrypted,
+            expanded_key,
+            rounds
+            )
+    print ("Decrypted")
+    print (decrypted)
 
 
 

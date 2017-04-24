@@ -141,14 +141,15 @@ class AES:
         return s
 
     def __inv_mix_columns(self, s):
-        for i in range(4):
+        for i in range(len(s)):
             u = xtime(xtime(s[i][0] ^ s[i][2]))
             v = xtime(xtime(s[i][1] ^ s[i][3]))
             s[i][0] ^= u
             s[i][1] ^= v
             s[i][2] ^= u
             s[i][3] ^= v
-        return s
+
+        return self.__mix_columns(s)
 
     def encrypt(self, block, expanded_key, rounds):
         """ Function that will call every stage of the encryption """
@@ -168,18 +169,18 @@ class AES:
 
     def decrypt(self, block, expanded_key, rounds):
         """ Function that will call every the inverse of the encryption """
-        state = self.__add_round_key(block, expanded_key)
+        state = self.__add_round_key(block, expanded_key[rounds*len(block):(rounds+1)*len(block)])
 
         for i in range(rounds -1, 0, -1):
 
             state = self.__inv_shift_rows(state)
             state = self.__inv_sub_bytes(state)
-            state = self.__add_round_key(state, expanded_key)
+            state = self.__add_round_key(state, expanded_key[i*len(block):(i+1)*len(block)])
             state = self.__inv_mix_columns(state)
 
         state = self.__inv_shift_rows(state)
         state = self.__inv_sub_bytes(state)
-        state = self.__add_round_key(state, expanded_key)
+        state = self.__add_round_key(state, expanded_key[:rounds])
 
         return state
 
@@ -209,7 +210,6 @@ def main(filename, keyfile):
             rounds
             )
     print ("Ecrypted")
-    # Should be [[105, 196, 224, 216], [106, 123, 4, 48], [216, 205, 183, 128], [112, 180, 197, 90]]
     print (encrypted)
     decrypted = aes.decrypt(
             encrypted,

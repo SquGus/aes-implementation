@@ -105,6 +105,7 @@ def matrix_to_bytes(matrix):
 class AES:
 
     def __add_round_key(self, state, key):
+
         s = [[None for j in range(4)] for i in range(len(state))]
         for i, x in enumerate(state):
             for j, byte in enumerate(x):
@@ -151,23 +152,17 @@ class AES:
 
     def encrypt(self, block, expanded_key, rounds):
         """ Function that will call every stage of the encryption """
-        state = self.__add_round_key(block, expanded_key)
+        state = self.__add_round_key(block, expanded_key[:len(block)])
 
         for i in range(1, rounds):
-            print("Debug")
-            print(state)
             state = self.__sub_bytes(state)
-            print(state)
             state = self.__shift_rows(state)
-            print(state)
             state = self.__mix_columns(state)
-            print(state)
-            state = self.__add_round_key(state, expanded_key)
-            print(state)
+            state = self.__add_round_key(state, expanded_key[i*len(block):(i+1)*len(block)])
 
         state = self.__sub_bytes(state)
         state = self.__shift_rows(state)
-        state = self.__add_round_key(state, expanded_key)
+        state = self.__add_round_key(state, expanded_key[rounds*len(block):(rounds+1)*len(block)])
 
         return state
 

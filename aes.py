@@ -67,7 +67,7 @@ def expand_key(key):
     expandedKey = [0] * 176
     temp, c, i = [0,0,0,0], 16, 1
     for j in range (0, 16):
-	    expandedKey.append(key[i])
+	    expandedKey[j] = key[j]
 
     while c < 176:
 	    for a in range (0, 4):

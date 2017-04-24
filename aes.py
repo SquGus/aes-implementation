@@ -154,10 +154,16 @@ class AES:
         state = self.__add_round_key(block, expanded_key)
 
         for i in range(1, rounds):
+            print("Debug")
+            print(state)
             state = self.__sub_bytes(state)
+            print(state)
             state = self.__shift_rows(state)
+            print(state)
             state = self.__mix_columns(state)
+            print(state)
             state = self.__add_round_key(state, expanded_key)
+            print(state)
 
         state = self.__sub_bytes(state)
         state = self.__shift_rows(state)
@@ -195,7 +201,7 @@ def main(filename, keyfile):
     ## IM TESTING WITH THIS VALUES
     # KEY 000102030405060708090a0b0c0d0e0f
     # PLAINTEXT 00112233445566778899aabbccddeeff
-    # blocks = read_file(filename)
+    # test = read_file(filename)
     rounds = 10
 
     block = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
@@ -208,6 +214,7 @@ def main(filename, keyfile):
             rounds
             )
     print ("Ecrypted")
+    # Should be [[105, 196, 224, 216], [106, 123, 4, 48], [216, 205, 183, 128], [112, 180, 197, 90]]
     print (encrypted)
     decrypted = aes.decrypt(
             encrypted,

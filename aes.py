@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*- 
+
 import sys
 import os.path
 import base64
@@ -57,24 +60,31 @@ def read_key(keyname):
         return -1
     return key
 
+def rotate(word, n):
+    return word[n:]+word[0:n]
 
 def expand_key(key):
     expandedKey = [0] * 176
-    temp, c, i = [0] * 4, 16, 1
+    temp, c, i = [0,0,0,0], 16, 1
     for j in range (0, 16):
-	    expandedKey[j] = key[j]
+	    expandedKey.append(key[i])
 
     while c < 176:
 	    for a in range (0, 4):
 		    temp[a] = expandedKey[a+c -4]
 	    if (c % 16 == 0):
-		    #Falta rotate
+            #Rotación de bytes en temp
+		    rotate(temp, 1)
 		    for a in range(0,4):
-			    #Sbox
-			    temp[a]
+			    temp[a] = s_box[temp[a]]
+            #XOR con la constante de ronda i
+            #rcon????
+            #temp[0] = temp[0]^rcon[i]
+            i += 1
 	    for a in range(0,4):
-		    expandedKey[c] = (xor(bool(expandedKey[c-16]), bool(temp[a])))
+		    expandedKey[c] = (expandedKey[c - 16]) ^ (temp[a])
 		    c = c + 1
+    return expandedKey
 
 def read_file(filename):
     """ Reads file and returns list with 16byte-blocks """

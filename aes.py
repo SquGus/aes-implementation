@@ -5,7 +5,6 @@ import sys
 import os.path
 import base64
 import copy
-from operator import xor
 
 BLOCK_SIZE = 16
 
@@ -62,34 +61,32 @@ def read_key(keyname):
 		return -1
 	return key
 
-def rotate(word, n):
-	return word[n:]+word[0:n]
+def xor(s1, s2):
+    return tuple(a^b for a,b in zip(s1, s2))
+    
+def sub_word(word):
+    return (s_box[b] for b in word)
+    
+def rot_word(word):
+    return word[1:] + word[:1]
 
 def expand_key(key):
-	expandedKey = [0x00] * 176
-	print(expandedKey)
-	print(s_box)
-	temp, c, i = [0x00,0x00,0x00,0x00], 16, 1
-	for j in range (0, 16):
-		expandedKey[j] = key[j]
+    nb = 4
+    nr = 10
+    nk = 4
+    expanded = []
+    expanded.extend(map(ord, key))
+    print("EXPANDED" , expanded)
+    for i in range(nk, nb * (nr + 1)):
+        t = expanded[(i-1)*4:i*4]
+        if i % nk == 0:
+            t = xor(sub_word(rot_word(t)), (Rcon[i // nk],0,0,0) )
+        elif nk > 6 and i % nk == 4:
+            t = sub_word(t)
+        expanded.extend( xor(t, expanded[(i-nk)*4:(i-nk+1)*4]))
+    subList = [expanded[n:n+4] for n in range(0, len(expanded), 4)]
+    return subList
 
-	while c < 176:
-		for a in range (0, 4):
-			temp[a] = expandedKey[a+c -4]
-		if (c % 16 == 0):
-			#Rotación de bytes en temp
-			rotate(temp, 1)
-			for a in range(0,4):
-				print("0x" + (temp[a][2:].zfill(2)))
-				#temp[a] = s_box.index("{0:#0{1}x}".format(temp[a], 4))
-			#XOR con la constante de ronda i
-			#rcon????
-			temp[0] = temp[0]^Rcon[i]
-			i += 1
-		for a in range(0,4):
-			expandedKey[c] = (expandedKey[c - 16]) ^ (temp[a])
-			c = c + 1
-	return key
 
 def read_file(filename):
 	""" Reads file and returns list with 16byte-blocks """
@@ -207,7 +204,8 @@ def main(filename, keyfile):
 	if key == -1:
 		return
 	else:
-		expanded_key = expand_key(key)
+		key = str(key)
+		expanded_key = expand_key(key.decode('hex'))
 
 	# block = read_file(filename)
 
@@ -216,7 +214,7 @@ def main(filename, keyfile):
 	# KEY 000102030405060708090a0b0c0d0e0f
 	# PLAINTEXT 00112233445566778899aabbccddeeff
 	""" MAKE SURE THAT IN THE FUCTION IF WE USE THAT KEY WE GET THIS EXPANDED KEY: :"""
-	expanded_key = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254], [182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254], [182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65], [71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253], [60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170], [94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107], [20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38], [71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210], [84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78], [19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
+	#expanded_key = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254], [182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254], [182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65], [71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253], [60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170], [94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107], [20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38], [71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210], [84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78], [19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
 	""" AND THE PLAINTEXT SHOULD BECOME THIS: """
 	block = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
 

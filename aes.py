@@ -120,31 +120,19 @@ def matrix_to_bytes(matrix):
 	return bytes(sum(matrix, []))
 
 def print_matrix(matrixOfMatrices):
+	""" Prints without problem the matrix as bytes """
 	string = []
 	for matrix in matrixOfMatrices:
 		string.append(matrix_to_bytes(matrix))
-		# print(matrixOfMatrices[m])
-		# for j, row in enumerate(matrix):
-
-		# 	for i, byte in enumerate(row):
-		# 		string += hex(byte)[2:].zfill(2)
-		# 		if (i+1)%2 == 0:
-		# 			string += ' '
-		# 	if (j+1)%4 == 0:
-		# 		string += '\n'
 	for s in string:
 		print(s)
 
 def print_encoded_matrix(matrixOfMatrices):
+	""" Prints encrypted matrix in a confusing hex interpretation of every byte """
+	""" Maybe this is a wrong way to print bytes and compare them to cryptool """
 	string = ''
 	for matrix in matrixOfMatrices:
-		# print(matrix)
 		for j, row in enumerate(matrix):
-			# print(row)
-			# s = ''
-			# for i, byte in enumerate(row):
-			# 	print(hex(byte)[2:].zfill(2))
-
 			for i, byte in enumerate(row):
 				string += hex(byte)[2:].zfill(2)
 				if (i+1)%2 == 0:
@@ -248,23 +236,9 @@ def main(filename, keyfile):
 		expanded_key = expand_key(key)
 
 	byteArray = read_file(filename)
-	for block in byteArray:
-		print(block)
-
-	""" OK, HERE WE NEED TO PASS THE BLOCK AND THE EXPANDED KEY """
-	""" THESE ARE THE VALUES I AM USING:"""
-	# KEY 000102030405060708090a0b0c0d0e0f
-	# PLAINTEXT 48454c4c4f2041455320574f524c4421
-	""" MAKE SURE THAT IN THE FUCTION IF WE USE THAT KEY WE GET THIS EXPANDED KEY: :"""
-	#expanded_key = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254], [182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254], [182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65], [71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253], [60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170], [94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107], [20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38], [71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210], [84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78], [19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
-	""" AND THE PLAINTEXT SHOULD BECOME THIS: """
-	# block = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
 
 	rounds = 10
 
-	#This works for a block, just do block in blocks if needed for a larger file
-	# print ("Plaintext")
-	# print (block)
 	aes = AES()
 	encrypted = []
 	decrypted = []
@@ -273,29 +247,43 @@ def main(filename, keyfile):
 		byteArray[i] = bytes_to_matrix(block)
 
 	print ("\nPre ecrypted")
-	# print(byteArray)
 	print_matrix(byteArray)
 
+	# CBC encryption
+	prevBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
 	for block in byteArray:
-		encrypted.append(aes.encrypt(
-			block,
-			expanded_key,
-			rounds
-			)
-		)
-	print ("\nEcrypted")
-	# print (encrypted)
-	print_matrix(encrypted)
+		for i, x in enumerate(block):
+			for j, y in enumerate(x):
+				block[i][j] = block[i][j] ^ prevBlock[i][j]
 
-	for block in encrypted:
-		decrypted.append(aes.decrypt(
+		prevBlock = (aes.encrypt(
 			block,
 			expanded_key,
 			rounds
 			)
 		)
+		encrypted.append(prevBlock)
+
+	print ("\nEcrypted")
+	print_encoded_matrix(encrypted)
+
+	# CBC decryption
+	initBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
+	for block in encrypted:
+		temp = aes.decrypt(
+			block,
+			expanded_key,
+			rounds
+			)
+
+		for i, x in enumerate(temp):
+			for j, y in enumerate(x):
+				temp[i][j] = temp[i][j] ^ initBlock[i][j]
+
+		decrypted.append(temp)
+		initBlock = block
+
 	print ("\nDecrypted")
-	# print (decrypted)
 	print_matrix(decrypted)
 
 

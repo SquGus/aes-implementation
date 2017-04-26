@@ -111,10 +111,7 @@ def read_file(filename):
 
 def bytes_to_matrix(block):
 	""" Converts 16 byte array to 4x4 matrix. """
-	# print("\nWTF: ", binascii.unhexlify(block[0:2]))
 	matrix = [list(block[i:i+4]) for i in range(0, len(block), 4)]
-	# print(type(matrix[0]))
-	# print(matrix)
 	return matrix
 
 
@@ -123,9 +120,31 @@ def matrix_to_bytes(matrix):
 	return bytes(sum(matrix, []))
 
 def print_matrix(matrixOfMatrices):
+	string = []
+	for matrix in matrixOfMatrices:
+		string.append(matrix_to_bytes(matrix))
+		# print(matrixOfMatrices[m])
+		# for j, row in enumerate(matrix):
+
+		# 	for i, byte in enumerate(row):
+		# 		string += hex(byte)[2:].zfill(2)
+		# 		if (i+1)%2 == 0:
+		# 			string += ' '
+		# 	if (j+1)%4 == 0:
+		# 		string += '\n'
+	for s in string:
+		print(s)
+
+def print_encoded_matrix(matrixOfMatrices):
 	string = ''
 	for matrix in matrixOfMatrices:
+		# print(matrix)
 		for j, row in enumerate(matrix):
+			# print(row)
+			# s = ''
+			# for i, byte in enumerate(row):
+			# 	print(hex(byte)[2:].zfill(2))
+
 			for i, byte in enumerate(row):
 				string += hex(byte)[2:].zfill(2)
 				if (i+1)%2 == 0:
@@ -133,6 +152,7 @@ def print_matrix(matrixOfMatrices):
 			if (j+1)%4 == 0:
 				string += '\n'
 	print(string)
+
 
 class AES:
 
@@ -228,6 +248,8 @@ def main(filename, keyfile):
 		expanded_key = expand_key(key)
 
 	byteArray = read_file(filename)
+	for block in byteArray:
+		print(block)
 
 	""" OK, HERE WE NEED TO PASS THE BLOCK AND THE EXPANDED KEY """
 	""" THESE ARE THE VALUES I AM USING:"""

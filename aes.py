@@ -5,8 +5,10 @@ import sys
 import os.path
 import base64
 import copy
+import binascii
 
-BLOCK_SIZE = 16
+BLOCK_SIZE = 8
+KEY_SIZE = 16
 
 s_box = (
 		0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -54,10 +56,14 @@ xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
 # Reads key and returns bytes of that key
 def read_key(keyname):
 	file = open(keyname, "rb")
-	key = base64.b16encode(file.read(BLOCK_SIZE))
+	key = base64.b16encode(file.read(KEY_SIZE))
+	keyCheck = base64.b16encode(file.read(KEY_SIZE))
 
-	if not key or len(key) < 32:
+	if not key or len(key) < KEY_SIZE*2:
 		print("ERROR: Key is not large enough.")
+		return -1
+	if keyCheck:
+		print("ERROR: Key is too large.")
 		return -1
 	return key
 
@@ -76,7 +82,6 @@ def expand_key(key):
     nk = 4
     expanded = []
     expanded.extend(map(ord, key))
-    print("EXPANDED" , expanded)
     for i in range(nk, nb * (nr + 1)):
         t = expanded[(i-1)*4:i*4]
         if i % nk == 0:
@@ -91,28 +96,43 @@ def expand_key(key):
 def read_file(filename):
 	""" Reads file and returns list with 16byte-blocks """
 	file = open(filename, "rb")
-	fileBytes = [];
+	fileBytes = []
 	while True:
 		block = base64.b16encode(file.read(BLOCK_SIZE))
 		if not block:
 			break
 		# Adds 01 and 00's to complete block
-		if len(block) < 32:
+		if len(block) < (BLOCK_SIZE*2):
 			block += b'01'
-			while len(block) < 32:
+			while len(block) < (BLOCK_SIZE*2):
 				block += b'00'
-			fileBytes.append(block)
+		fileBytes.append(block)
 	return fileBytes
 
 def bytes_to_matrix(block):
 	""" Converts 16 byte array to 4x4 matrix. """
+	# print("\nWTF: ", binascii.unhexlify(block[0:2]))
 	matrix = [list(block[i:i+4]) for i in range(0, len(block), 4)]
+	# print(type(matrix[0]))
+	# print(matrix)
 	return matrix
 
 
 def matrix_to_bytes(matrix):
 	""" Converts 4x4 matrix to a 16 byte array. """
 	return bytes(sum(matrix, []))
+
+def print_matrix(matrixOfMatrices):
+	string = ''
+	for matrix in matrixOfMatrices:
+		for j, row in enumerate(matrix):
+			for i, byte in enumerate(row):
+				string += hex(byte)[2:].zfill(2)
+				if (i+1)%2 == 0:
+					string += ' '
+			if (j+1)%4 == 0:
+				string += '\n'
+	print(string)
 
 class AES:
 
@@ -205,39 +225,56 @@ def main(filename, keyfile):
 		return
 	else:
 		key = str(key)
-		expanded_key = expand_key(key.decode('hex'))
+		expanded_key = expand_key(key)
 
-	# block = read_file(filename)
+	byteArray = read_file(filename)
 
 	""" OK, HERE WE NEED TO PASS THE BLOCK AND THE EXPANDED KEY """
 	""" THESE ARE THE VALUES I AM USING:"""
 	# KEY 000102030405060708090a0b0c0d0e0f
-	# PLAINTEXT 00112233445566778899aabbccddeeff
+	# PLAINTEXT 48454c4c4f2041455320574f524c4421
 	""" MAKE SURE THAT IN THE FUCTION IF WE USE THAT KEY WE GET THIS EXPANDED KEY: :"""
 	#expanded_key = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [214, 170, 116, 253], [210, 175, 114, 250], [218, 166, 120, 241], [214, 171, 118, 254], [182, 146, 207, 11], [100, 61, 189, 241], [190, 155, 197, 0], [104, 48, 179, 254], [182, 255, 116, 78], [210, 194, 201, 191], [108, 89, 12, 191], [4, 105, 191, 65], [71, 247, 247, 188], [149, 53, 62, 3], [249, 108, 50, 188], [253, 5, 141, 253], [60, 170, 163, 232], [169, 159, 157, 235], [80, 243, 175, 87], [173, 246, 34, 170], [94, 57, 15, 125], [247, 166, 146, 150], [167, 85, 61, 193], [10, 163, 31, 107], [20, 249, 112, 26], [227, 95, 226, 140], [68, 10, 223, 77], [78, 169, 192, 38], [71, 67, 135, 53], [164, 28, 101, 185], [224, 22, 186, 244], [174, 191, 122, 210], [84, 153, 50, 209], [240, 133, 87, 104], [16, 147, 237, 156], [190, 44, 151, 78], [19, 17, 29, 127], [227, 148, 74, 23], [243, 7, 167, 139], [77, 43, 48, 197]]
 	""" AND THE PLAINTEXT SHOULD BECOME THIS: """
-	block = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
+	# block = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
 
 	rounds = 10
 
 	#This works for a block, just do block in blocks if needed for a larger file
-	print ("Plaintext")
-	print (block)
+	# print ("Plaintext")
+	# print (block)
 	aes = AES()
-	encrypted = aes.encrypt(
+	encrypted = []
+	decrypted = []
+
+	for i, block in enumerate(byteArray):
+		byteArray[i] = bytes_to_matrix(block)
+
+	print ("\nPre ecrypted")
+	# print(byteArray)
+	print_matrix(byteArray)
+
+	for block in byteArray:
+		encrypted.append(aes.encrypt(
 			block,
 			expanded_key,
 			rounds
 			)
-	print ("Ecrypted")
-	print (encrypted)
-	decrypted = aes.decrypt(
-			encrypted,
+		)
+	print ("\nEcrypted")
+	# print (encrypted)
+	print_matrix(encrypted)
+
+	for block in encrypted:
+		decrypted.append(aes.decrypt(
+			block,
 			expanded_key,
 			rounds
 			)
-	print ("Decrypted")
-	print (decrypted)
+		)
+	print ("\nDecrypted")
+	# print (decrypted)
+	print_matrix(decrypted)
 
 
 

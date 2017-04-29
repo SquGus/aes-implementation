@@ -7,7 +7,7 @@ import base64
 import copy
 import binascii
 
-BLOCK_SIZE = 8
+BLOCK_SIZE = 16
 KEY_SIZE = 16
 
 s_box = (
@@ -48,18 +48,41 @@ inv_s_box = (
 		0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 		)
 
-Rcon = ( 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a )
+Rcon = (
+	0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a
+	)
 
-# God praise stack overflow, basically cross product
-xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
+def read_file(filename):
+	""" Reads file and returns list with 16byte-blocks """
+	file = open(filename, "rb")
+	fileBytes = []
+	while True:
+		block = bytearray(file.read(BLOCK_SIZE))
+		if not block:
+			break
+		
+		if len(block) < (BLOCK_SIZE):
+			# Completes small block with 01 and 00's
+			block += bytearray([1])
+			while len(block) < (BLOCK_SIZE):
+				block += bytearray([0])
+		else:
+			# Adds another block of 01 and 00's
+			fileBytes.append(block)
+			block = bytearray([1])
+			while len(block) < (BLOCK_SIZE):
+				block += bytearray([0])
+		fileBytes.append(block)
+	file.close()
+	return fileBytes
 
-# Reads key and returns bytes of that key
 def read_key(keyname):
+	""" Reads key and returns bytes of that key """
 	file = open(keyname, "rb")
-	key = base64.b16encode(file.read(KEY_SIZE))
-	keyCheck = base64.b16encode(file.read(KEY_SIZE))
+	key = bytearray(file.read(KEY_SIZE))
+	keyCheck = bytearray(file.read(KEY_SIZE))
 
-	if not key or len(key) < KEY_SIZE*2:
+	if not key or len(key) < KEY_SIZE:
 		print("ERROR: Key is not large enough.")
 		return -1
 	if keyCheck:
@@ -67,85 +90,105 @@ def read_key(keyname):
 		return -1
 	return key
 
-def xor(s1, s2):
-    return tuple(a^b for a,b in zip(s1, s2))
-    
-def sub_word(word):
-    return (s_box[b] for b in word)
-    
-def rot_word(word):
-    return word[1:] + word[:1]
-
 def expand_key(key):
-    nb = 4
-    nr = 10
-    nk = 4
-    expanded = []
-    expanded.extend(map(ord, key))
-    for i in range(nk, nb * (nr + 1)):
-        t = expanded[(i-1)*4:i*4]
-        if i % nk == 0:
-            t = xor(sub_word(rot_word(t)), (Rcon[i // nk],0,0,0) )
-        elif nk > 6 and i % nk == 4:
-            t = sub_word(t)
-        expanded.extend( xor(t, expanded[(i-nk)*4:(i-nk+1)*4]))
-    subList = [expanded[n:n+4] for n in range(0, len(expanded), 4)]
-    return subList
-
-
-def read_file(filename):
-	""" Reads file and returns list with 16byte-blocks """
-	file = open(filename, "rb")
-	fileBytes = []
-	while True:
-		block = base64.b16encode(file.read(BLOCK_SIZE))
-		if not block:
-			break
-		# Adds 01 and 00's to complete block
-		if len(block) < (BLOCK_SIZE*2):
-			block += b'01'
-			while len(block) < (BLOCK_SIZE*2):
-				block += b'00'
-		fileBytes.append(block)
-	return fileBytes
+	""" Expands key that receives from bytearray """
+	nb = 4
+	nr = 10
+	nk = 4
+	expanded = []
+	expanded.extend(key)
+	for i in range(nk, nb * (nr + 1)):
+		t = expanded[(i-1)*4:i*4]
+		if i % nk == 0:
+			t = xor(sub_word(rot_word(t)), (Rcon[i // nk],0,0,0) )
+		elif nk > 6 and i % nk == 4:
+			t = sub_word(t)
+		expanded.extend( xor(t, expanded[(i-nk)*4:(i-nk+1)*4]))
+	subList = [expanded[n:n+4] for n in range(0, len(expanded), 4)]
+	return subList
 
 def bytes_to_matrix(block):
 	""" Converts 16 byte array to 4x4 matrix. """
 	matrix = [list(block[i:i+4]) for i in range(0, len(block), 4)]
 	return matrix
 
-
 def matrix_to_bytes(matrix):
 	""" Converts 4x4 matrix to a 16 byte array. """
 	return bytes(sum(matrix, []))
 
-def print_matrix(matrixOfMatrices):
-	""" Prints without problem the matrix as bytes """
-	string = []
-	for matrix in matrixOfMatrices:
-		string.append(matrix_to_bytes(matrix))
-	for s in string:
-		print(s)
+# God praise stack overflow, basically cross product
+xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
 
-def print_encoded_matrix(matrixOfMatrices):
-	""" Prints encrypted matrix in a confusing hex interpretation of every byte """
-	""" Maybe this is a wrong way to print bytes and compare them to cryptool """
-	string = ''
+def xor(s1, s2):
+	return tuple(a^b for a,b in zip(s1, s2))
+	
+def sub_word(word):
+	return (s_box[b] for b in word)
+	
+def rot_word(word):
+	return word[1:] + word[:1]
+
+def print_byte_array(array):
+	for byte in array:
+		print(hex(byte), end=' ')
+	print()
+	print()
+
+def print_array(array):
+	for byte in array:
+		print(byte, end=' ')
+	print()
+	print()
+
+def print_byte_matrix(matrix):
+	for row in matrix:
+		for byte in row:
+			print(hex(byte), end=' ')
+		print()
+	print()
+
+def print_matrix(matrix):
+	for row in matrix:
+		for byte in row:
+			print(byte, end=' ')
+		print()
+	print()
+
+def print_byte_matrices(matrixOfMatrices):
 	for matrix in matrixOfMatrices:
-		for j, row in enumerate(matrix):
-			for i, byte in enumerate(row):
-				string += hex(byte)[2:].zfill(2)
-				if (i+1)%2 == 0:
-					string += ' '
-			if (j+1)%4 == 0:
-				string += '\n'
-	print(string)
+		for row in matrix:
+			for byte in row:
+				print(hex(byte), end=' ')
+			print()
+		print()
+	print()
+
+# def print_matrix(matrixOfMatrices):
+# 	""" Prints without problem the matrix as bytes """
+# 	string = []
+# 	for matrix in matrixOfMatrices:
+# 		string.append(matrix_to_bytes(matrix))
+# 	for s in string:
+# 		print(s)
+
+# def print_encoded_matrix(matrixOfMatrices):
+# 	""" Prints encrypted matrix in a confusing hex interpretation of every byte """
+# 	""" Maybe this is a wrong way to print bytes and compare them to cryptool """
+# 	string = ''
+# 	for matrix in matrixOfMatrices:
+# 		for j, row in enumerate(matrix):
+# 			for i, byte in enumerate(row):
+# 				string += hex(byte)[2:].zfill(2)
+# 				if (i+1)%2 == 0:
+# 					string += ' '
+# 			if (j+1)%4 == 0:
+# 				string += '\n'
+# 	print(string)
 
 
 class AES:
 
 	def __add_round_key(self, state, key):
-
 		s = [[None for j in range(4)] for i in range(len(state))]
 		for i, x in enumerate(state):
 			for j, byte in enumerate(x):
@@ -228,14 +271,68 @@ class AES:
 def main(filename, keyfile):
 	name = filename
 	key = read_key(keyfile)
+	# key = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]
 
 	if key == -1:
 		return
 	else:
-		key = str(key)
+		print_byte_array(key)
+		# key = str(key)
 		expanded_key = expand_key(key)
+		# print_byte_matrix(expanded_key)
+		"""
+		expanded_key = [
+			[0, 1, 2, 3],
+			[4, 5, 6, 7],
+			[8, 9, 10, 11],
+			[12, 13, 14, 15],
+			[214, 170, 116, 253],
+			[210, 175, 114, 250],
+			[218, 166, 120, 241],
+			[214, 171, 118, 254],
+			[182, 146, 207, 11],
+			[100, 61, 189, 241],
+			[190, 155, 197, 0],
+			[104, 48, 179, 254],
+			[182, 255, 116, 78],
+			[210, 194, 201, 191],
+			[108, 89, 12, 191],
+			[4, 105, 191, 65],
+			[71, 247, 247, 188],
+			[149, 53, 62, 3],
+			[249, 108, 50, 188],
+			[253, 5, 141, 253],
+			[60, 170, 163, 232],
+			[169, 159, 157, 235],
+			[80, 243, 175, 87],
+			[173, 246, 34, 170],
+			[94, 57, 15, 125],
+			[247, 166, 146, 150],
+			[167, 85, 61, 193],
+			[10, 163, 31, 107],
+			[20, 249, 112, 26],
+			[227, 95, 226, 140],
+			[68, 10, 223, 77],
+			[78, 169, 192, 38],
+			[71, 67, 135, 53],
+			[164, 28, 101, 185],
+			[224, 22, 186, 244],
+			[174, 191, 122, 210],
+			[84, 153, 50, 209],
+			[240, 133, 87, 104],
+			[16, 147, 237, 156],
+			[190, 44, 151, 78],
+			[19, 17, 29, 127],
+			[227, 148, 74, 23],
+			[243, 7, 167, 139],
+			[77, 43, 48, 197]]
+		"""
 
 	byteArray = read_file(filename)
+	print_byte_matrix(byteArray)
+	# byteArray = [[0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x00]]
+	# byteArray = [[0x0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]]
+	# byteArray = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
 
 	rounds = 10
 
@@ -246,8 +343,9 @@ def main(filename, keyfile):
 	for i, block in enumerate(byteArray):
 		byteArray[i] = bytes_to_matrix(block)
 
+	
 	print ("\nPre ecrypted")
-	print_matrix(byteArray)
+	print_byte_matrices(byteArray)
 
 	# CBC encryption
 	prevBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
@@ -265,7 +363,7 @@ def main(filename, keyfile):
 		encrypted.append(prevBlock)
 
 	print ("\nEcrypted")
-	print_encoded_matrix(encrypted)
+	print_byte_matrices(encrypted)
 
 	# CBC decryption
 	initBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
@@ -284,8 +382,7 @@ def main(filename, keyfile):
 		initBlock = block
 
 	print ("\nDecrypted")
-	print_matrix(decrypted)
-
+	print_byte_matrices(decrypted)
 
 
 if __name__ == "__main__":

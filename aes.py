@@ -9,6 +9,7 @@ import binascii
 
 BLOCK_SIZE = 16
 KEY_SIZE = 16
+ROUNDS = 10
 
 s_box = (
 		0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -69,9 +70,11 @@ def read_file(filename):
 		else:
 			# Adds another block of 01 and 00's
 			fileBytes.append(block)
-			block = bytearray([1])
-			while len(block) < (BLOCK_SIZE):
-				block += bytearray([0])
+			block = bytearray(file.read(BLOCK_SIZE))
+			if not block:
+				block = bytearray([1])
+				while len(block) < (BLOCK_SIZE):
+					block += bytearray([0])
 		fileBytes.append(block)
 	file.close()
 	return fileBytes
@@ -112,9 +115,14 @@ def bytes_to_matrix(block):
 	matrix = [list(block[i:i+4]) for i in range(0, len(block), 4)]
 	return matrix
 
-def matrix_to_bytes(matrix):
-	""" Converts 4x4 matrix to a 16 byte array. """
-	return bytes(sum(matrix, []))
+# USELESS
+# def matrix_to_bytes(matrix):
+# 	""" Converts 4x4 matrix to a 16 byte array. """
+# 	block = bytearray()
+# 	for row in matrix:
+# 		for byte in matrix:
+# 			block += bytearray([byte])
+# 	return block
 
 # God praise stack overflow, basically cross product
 xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
@@ -163,28 +171,15 @@ def print_byte_matrices(matrixOfMatrices):
 		print()
 	print()
 
-# def print_matrix(matrixOfMatrices):
-# 	""" Prints without problem the matrix as bytes """
-# 	string = []
-# 	for matrix in matrixOfMatrices:
-# 		string.append(matrix_to_bytes(matrix))
-# 	for s in string:
-# 		print(s)
+def write_in_file(matrixOfMatrices, fileName, fileExtension):
+	# Write blocks in a new file.
+	file = open(fileName + fileExtension, 'bw')
 
-# def print_encoded_matrix(matrixOfMatrices):
-# 	""" Prints encrypted matrix in a confusing hex interpretation of every byte """
-# 	""" Maybe this is a wrong way to print bytes and compare them to cryptool """
-# 	string = ''
-# 	for matrix in matrixOfMatrices:
-# 		for j, row in enumerate(matrix):
-# 			for i, byte in enumerate(row):
-# 				string += hex(byte)[2:].zfill(2)
-# 				if (i+1)%2 == 0:
-# 					string += ' '
-# 			if (j+1)%4 == 0:
-# 				string += '\n'
-# 	print(string)
-
+	for matrix in matrixOfMatrices:
+		for row in matrix:
+			file.write(bytes(row))
+	
+	file.close()
 
 class AES:
 
@@ -306,18 +301,8 @@ class AES:
 			initBlock = block
 		return decrypted
 
-	# MUST IMPLEMENT
-	"""def write_in_file(blocks, filename):
-		# Write blocks in a new file.
-		file = open(filename + '.txt', 'wb')
-		for block in blocks:
-			file_blocks.write(block)
-		file_blocks.close()
-	"""
-
-
-def main(filename, keyfile):
-	name = filename
+def main(command, filename, keyfile):
+	filePath, fileExtension = os.path.splitext(filename)
 
 	# Reads key
 	key = read_key(keyfile)
@@ -331,28 +316,58 @@ def main(filename, keyfile):
 	# Transforms byteArray into matrix of 4x4 matrices
 	for i, block in enumerate(byteArray):
 		byteArray[i] = bytes_to_matrix(block)
-	
-	rounds = 10
 
+	# Creates AES class
 	aes = AES()
-	
-	print ("\nPre ecrypted")
-	print_byte_matrices(byteArray)
 
-	encryptedArray = aes.CBC_encryption(byteArray, expandedKey, rounds)
-	print ("\nEcrypted")
-	print_byte_matrices(encryptedArray)
+	if command == '-e':
+		# ENCRYPTS FILE
+		encryptedArray = aes.CBC_encryption(byteArray, expandedKey, ROUNDS)
 
-	decryptedArray = aes.CBC_decryption(encryptedArray, expandedKey, rounds)
-	print ("\nDecrypted")
-	print_byte_matrices(decryptedArray)
+		# Appends extension to encrypted matrix
+		extensionArray = []
+		for ch in fileExtension:
+			extensionArray += bytearray([ord(ch)])
+		extensionArray = bytes_to_matrix(extensionArray)
+		encryptedArray.append(extensionArray)
+
+		# Writes file of bytes
+		write_in_file(encryptedArray, filePath, '.aes')
+		
+		print("SUCCESS: Encrypted")
+		
+	else:
+		# DECRYPTS FILE
+		if fileExtension != '.aes':
+			print('ERROR: File must be .aes file')
+			return
+		decryptedArray = aes.CBC_decryption(byteArray[:-1], expandedKey, ROUNDS)
+		
+		# Gets extension to write file
+		decryptedExtension = byteArray[-1:]
+		extension = ''
+		for matrix in decryptedExtension:
+			for row in matrix:
+				for byte in row:
+					if byte == 0:
+						break
+					extension += chr(byte)
+		
+		# Writes file of bytes
+		write_in_file(decryptedArray, filePath + '-dec', extension)
+		
+		print("SUCCESS: Decrypted")
+		print("Just delete trailing zeroes of file if needed")
 
 
 if __name__ == "__main__":
-	if (len(sys.argv) != 3):
-		print("Usage aes.py <file> <key>")
+	if (len(sys.argv) != 4):
+		print("ERROR: Usage aes.py <command> <file> <key>")
 	else:
-		if os.path.isfile(sys.argv[1]):
-			main(sys.argv[1], sys.argv[2])
+		if sys.argv[1] != '-e' and sys.argv[1] != '-d':
+			print('ERROR: Command should be "-e" for encryption or "-d" for decryption')
 		else:
-			print("File does not exist")
+			if os.path.isfile(sys.argv[2]) and os.path.isfile(sys.argv[3]):
+				main(sys.argv[1], sys.argv[2], sys.argv[3])
+			else:
+				print("ERROR: File(s) does not exist")

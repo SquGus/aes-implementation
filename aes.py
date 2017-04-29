@@ -267,122 +267,85 @@ class AES:
 
 		return state
 
+	def CBC_encryption(self, byteArray, expandedKey, rounds):
+		# CBC encryption
+		encrypted = []
+		prevBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
+
+		for block in byteArray:
+			for i, x in enumerate(block):
+				for j, y in enumerate(x):
+					block[i][j] = block[i][j] ^ prevBlock[i][j]
+
+			prevBlock = (self.encrypt(
+				block,
+				expandedKey,
+				rounds
+				)
+			)
+			encrypted.append(prevBlock)
+		return encrypted
+
+	def CBC_decryption(self, byteArray, expandedKey, rounds):
+		# CBC decryption
+		decrypted = []
+		initBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
+		
+		for block in byteArray:
+			temp = self.decrypt(
+				block,
+				expandedKey,
+				rounds
+				)
+
+			for i, x in enumerate(temp):
+				for j, y in enumerate(x):
+					temp[i][j] = temp[i][j] ^ initBlock[i][j]
+
+			decrypted.append(temp)
+			initBlock = block
+		return decrypted
+
+	# MUST IMPLEMENT
+	"""def write_in_file(blocks, filename):
+		# Write blocks in a new file.
+		file = open(filename + '.txt', 'wb')
+		for block in blocks:
+			file_blocks.write(block)
+		file_blocks.close()
+	"""
+
 
 def main(filename, keyfile):
 	name = filename
-	key = read_key(keyfile)
-	# key = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]
 
+	# Reads key
+	key = read_key(keyfile)
 	if key == -1:
 		return
 	else:
-		print_byte_array(key)
-		# key = str(key)
-		expanded_key = expand_key(key)
-		# print_byte_matrix(expanded_key)
-		"""
-		expanded_key = [
-			[0, 1, 2, 3],
-			[4, 5, 6, 7],
-			[8, 9, 10, 11],
-			[12, 13, 14, 15],
-			[214, 170, 116, 253],
-			[210, 175, 114, 250],
-			[218, 166, 120, 241],
-			[214, 171, 118, 254],
-			[182, 146, 207, 11],
-			[100, 61, 189, 241],
-			[190, 155, 197, 0],
-			[104, 48, 179, 254],
-			[182, 255, 116, 78],
-			[210, 194, 201, 191],
-			[108, 89, 12, 191],
-			[4, 105, 191, 65],
-			[71, 247, 247, 188],
-			[149, 53, 62, 3],
-			[249, 108, 50, 188],
-			[253, 5, 141, 253],
-			[60, 170, 163, 232],
-			[169, 159, 157, 235],
-			[80, 243, 175, 87],
-			[173, 246, 34, 170],
-			[94, 57, 15, 125],
-			[247, 166, 146, 150],
-			[167, 85, 61, 193],
-			[10, 163, 31, 107],
-			[20, 249, 112, 26],
-			[227, 95, 226, 140],
-			[68, 10, 223, 77],
-			[78, 169, 192, 38],
-			[71, 67, 135, 53],
-			[164, 28, 101, 185],
-			[224, 22, 186, 244],
-			[174, 191, 122, 210],
-			[84, 153, 50, 209],
-			[240, 133, 87, 104],
-			[16, 147, 237, 156],
-			[190, 44, 151, 78],
-			[19, 17, 29, 127],
-			[227, 148, 74, 23],
-			[243, 7, 167, 139],
-			[77, 43, 48, 197]]
-		"""
+		expandedKey = expand_key(key)
 
+	# Reads file
 	byteArray = read_file(filename)
-	print_byte_matrix(byteArray)
-	# byteArray = [[0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x00]]
-	# byteArray = [[0x0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]]
-	# byteArray = [[0, 17, 34, 51], [68, 85, 102, 119], [136, 153, 170, 187], [204, 221, 238, 255]]
-
+	# Transforms byteArray into matrix of 4x4 matrices
+	for i, block in enumerate(byteArray):
+		byteArray[i] = bytes_to_matrix(block)
+	
 	rounds = 10
 
 	aes = AES()
-	encrypted = []
-	decrypted = []
-
-	for i, block in enumerate(byteArray):
-		byteArray[i] = bytes_to_matrix(block)
-
 	
 	print ("\nPre ecrypted")
 	print_byte_matrices(byteArray)
 
-	# CBC encryption
-	prevBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
-	for block in byteArray:
-		for i, x in enumerate(block):
-			for j, y in enumerate(x):
-				block[i][j] = block[i][j] ^ prevBlock[i][j]
-
-		prevBlock = (aes.encrypt(
-			block,
-			expanded_key,
-			rounds
-			)
-		)
-		encrypted.append(prevBlock)
-
+	encryptedArray = aes.CBC_encryption(byteArray, expandedKey, rounds)
 	print ("\nEcrypted")
-	print_byte_matrices(encrypted)
+	print_byte_matrices(encryptedArray)
 
-	# CBC decryption
-	initBlock = [[0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]]
-	for block in encrypted:
-		temp = aes.decrypt(
-			block,
-			expanded_key,
-			rounds
-			)
-
-		for i, x in enumerate(temp):
-			for j, y in enumerate(x):
-				temp[i][j] = temp[i][j] ^ initBlock[i][j]
-
-		decrypted.append(temp)
-		initBlock = block
-
+	decryptedArray = aes.CBC_decryption(encryptedArray, expandedKey, rounds)
 	print ("\nDecrypted")
-	print_byte_matrices(decrypted)
+	print_byte_matrices(decryptedArray)
 
 
 if __name__ == "__main__":
